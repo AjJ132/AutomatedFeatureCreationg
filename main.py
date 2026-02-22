@@ -7,11 +7,22 @@ from src.services.file_service import FileService
 from src.services.parser_service import ParserService
 from src.usecase.chat.chat_usecase import ChatUseCase
 from src.usecase.index_codebase_usecase import IndexCodebaseUseCase
+from src.usecase.orchestration.orchestration_usecase import OrchestrationUseCase
 from src.usecase.search_codebase_usecase import SearchCodebaseUseCase
 
 if __name__ == "__main__":
     # Load .env file for OPENAI_API_KEY and other config
     load_dotenv()
+
+    initial_prompt = ""
+    with open("sample_requirements/#1/prompt.md", "r") as f:
+        initial_prompt = f.read()
+
+    orchestration_usecase = OrchestrationUseCase()
+    result = orchestration_usecase.execute(initial_prompt=initial_prompt)
+
+    print("Result:")
+    print(result)
 
     # # ── Wire up services ───────────────────────────────────────────────────────
     # parser_service = ParserService()
