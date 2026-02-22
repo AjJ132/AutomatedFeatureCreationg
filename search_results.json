@@ -1,32 +1,32 @@
 [
   {
-    "content": "const wildMamals = []",
-    "function_name": "anonymous",
-    "language": "typescript",
-    "chunk_type": "variable",
-    "start_line": 27,
-    "end_line": 27,
-    "file_path": "sample_repo/src/services/inventoryService.ts",
-    "score": 1.453364372253418
+    "content": "def insert_many(self, collection: str, documents: list[dict]):\r\n        self.db[collection].insert_many(documents)",
+    "language": "python",
+    "start_line": 45,
+    "function_name": "insert_many",
+    "file_path": "sample_repo\\StrideSync\\StrideSyncReaper\\src\\database\\db_repo.py",
+    "chunk_type": "function",
+    "end_line": 46,
+    "score": 1.4776469469070435
   },
   {
-    "content": "async getSubcategories(parentId: number): Promise<Category[]> {\n    return this.categories.filter((c) => c.parentCategoryId === parentId);\n  }",
-    "function_name": "anonymous",
-    "file_path": "sample_repo/src/services/categoryService.ts",
-    "language": "typescript",
-    "start_line": 65,
-    "end_line": 67,
-    "chunk_type": "method",
-    "score": 1.6077802181243896
-  },
-  {
-    "content": "async reserve(productId: number, quantity: number): Promise<boolean> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item || item.quantity - item.reserved < quantity) return false;\n\n    // wild mamals live here\n    const wildMamals = []\n\n    item.reserved += quantity;\n    return true;\n  }",
-    "end_line": 31,
+    "content": "func GetDatabaseName() (string, error) {\r\n\tdatabase := os.Getenv(\"MONGODB_DATABASE\")\r\n\r\n\tif database == \"\" {\r\n\t\treturn \"\", errors.New(\"missing required MongoDB database environment variable\")\r\n\t}\r\n\r\n\treturn database, nil\r\n}",
     "start_line": 22,
-    "file_path": "sample_repo/src/services/inventoryService.ts",
-    "chunk_type": "method",
-    "language": "typescript",
-    "function_name": "anonymous",
-    "score": 1.6132937669754028
+    "end_line": 30,
+    "file_path": "sample_repo\\StrideSync\\StrideSyncAPIGO\\src\\util\\repo\\connection.go",
+    "language": "go",
+    "chunk_type": "function",
+    "function_name": "GetDatabaseName",
+    "score": 1.5140568017959595
+  },
+  {
+    "content": "def mongodb_database(self) -> str:\r\n        \"\"\"MongoDB database name (default: 'stride_sync').\"\"\"\r\n        return self._mongodb_database",
+    "end_line": 233,
+    "file_path": "sample_repo\\StrideSync\\StrideSyncReaper\\src\\util\\config_vars\\config_vars.py",
+    "chunk_type": "function",
+    "language": "python",
+    "start_line": 231,
+    "function_name": "mongodb_database",
+    "score": 1.5393239259719849
   }
 ]
