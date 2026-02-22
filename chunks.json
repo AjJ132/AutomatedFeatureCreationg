@@ -1,0 +1,4115 @@
+[
+  {
+    "content": "function createApp(): Express {\n  const app = express();\n\n  // Body parser middleware\n  app.use(express.json());\n  app.use(express.urlencoded({ extended: true }));\n\n  // Custom middleware\n  app.use(loggingMiddleware);\n  app.use(requestValidationMiddleware);\n\n  // API version endpoint\n  app.get(\"/api/version\", (req, res) => {\n    res.json({ version: API_VERSION });\n  });\n\n  // Health check\n  app.get(\"/health\", (req, res) => {\n    res.json({ status: \"ok\", timestamp: new Date() });\n  });\n\n  // Routes\n  app.use(\"/api/users\", userRoutes);\n  app.use(\"/api/products\", productRoutes);\n  app.use(\"/api/orders\", authMiddleware, orderRoutes);\n\n  // 404 handler\n  app.use((req, res) => {\n    res.status(404).json({ message: \"Endpoint not found\" });\n  });\n\n  return app;\n}",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "createApp",
+    "start_line": 9,
+    "end_line": 41,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const app = express();",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 10,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(req, res) => {\n    res.json({ version: API_VERSION });\n  }",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "(req, res) => {\n    res.json({ status: \"ok\", timestamp: new Date() });\n  }",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "(req, res) => {\n    res.status(404).json({ message: \"Endpoint not found\" });\n  }",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 38,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "function startServer(): void {\n  const app = createApp();\n\n  app.listen(API_PORT, () => {\n    console.log(`Server running on port ${API_PORT}`);\n  });\n}",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "startServer",
+    "start_line": 43,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const app = createApp();",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 44,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "() => {\n    console.log(`Server running on port ${API_PORT}`);\n  }",
+    "file_path": "sample_repo/src/app.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 48,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "interface RateLimitOptions {\n  windowMs: number;\n  maxRequests: number;\n  keyGenerator?: (req: Request) => string;\n}",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 7,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface RateLimitEntry {\n  count: number;\n  resetTime: number;\n}",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class RateLimiter {\n  private store: Map<string, RateLimitEntry> = new Map();\n  private options: RateLimitOptions;\n\n  constructor(options: RateLimitOptions) {\n    this.options = options;\n  }\n\n  private getKey(req: Request): string {\n    if (this.options.keyGenerator) {\n      return this.options.keyGenerator(req);\n    }\n    return req.ip || \"unknown\";\n  }\n\n  check(key: string): { allowed: boolean; remaining: number; resetTime: number } {\n    const now = Date.now();\n    let entry = this.store.get(key);\n\n    if (!entry || entry.resetTime < now) {\n      entry = { count: 0, resetTime: now + this.options.windowMs };\n      this.store.set(key, entry);\n    }\n\n    entry.count += 1;\n\n    return {\n      allowed: entry.count <= this.options.maxRequests,\n      remaining: Math.max(0, this.options.maxRequests - entry.count),\n      resetTime: entry.resetTime,\n    };\n  }\n\n  middleware() {\n    return (req: Request, res: Response, next: NextFunction) => {\n      const key = this.getKey(req);\n      const { allowed, remaining, resetTime } = this.check(key);\n\n      res.set(\"X-RateLimit-Limit\", String(this.options.maxRequests));\n      res.set(\"X-RateLimit-Remaining\", String(remaining));\n      res.set(\"X-RateLimit-Reset\", String(Math.ceil(resetTime / 1000)));\n\n      if (!allowed) {\n        res.status(429).json({ message: \"Too many requests\" });\n        return;\n      }\n\n      next();\n    };\n  }\n\n  reset(key: string): void {\n    this.store.delete(key);\n  }\n\n  clear(): void {\n    this.store.clear();\n  }\n}",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 72,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(options: RateLimitOptions) {\n    this.options = options;\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "private getKey(req: Request): string {\n    if (this.options.keyGenerator) {\n      return this.options.keyGenerator(req);\n    }\n    return req.ip || \"unknown\";\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "check(key: string): { allowed: boolean; remaining: number; resetTime: number } {\n    const now = Date.now();\n    let entry = this.store.get(key);\n\n    if (!entry || entry.resetTime < now) {\n      entry = { count: 0, resetTime: now + this.options.windowMs };\n      this.store.set(key, entry);\n    }\n\n    entry.count += 1;\n\n    return {\n      allowed: entry.count <= this.options.maxRequests,\n      remaining: Math.max(0, this.options.maxRequests - entry.count),\n      resetTime: entry.resetTime,\n    };\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const now = Date.now();",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 30,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "let entry = this.store.get(key);",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 31,
+    "end_line": 31,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "middleware() {\n    return (req: Request, res: Response, next: NextFunction) => {\n      const key = this.getKey(req);\n      const { allowed, remaining, resetTime } = this.check(key);\n\n      res.set(\"X-RateLimit-Limit\", String(this.options.maxRequests));\n      res.set(\"X-RateLimit-Remaining\", String(remaining));\n      res.set(\"X-RateLimit-Reset\", String(Math.ceil(resetTime / 1000)));\n\n      if (!allowed) {\n        res.status(429).json({ message: \"Too many requests\" });\n        return;\n      }\n\n      next();\n    };\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 47,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(req: Request, res: Response, next: NextFunction) => {\n      const key = this.getKey(req);\n      const { allowed, remaining, resetTime } = this.check(key);\n\n      res.set(\"X-RateLimit-Limit\", String(this.options.maxRequests));\n      res.set(\"X-RateLimit-Remaining\", String(remaining));\n      res.set(\"X-RateLimit-Reset\", String(Math.ceil(resetTime / 1000)));\n\n      if (!allowed) {\n        res.status(429).json({ message: \"Too many requests\" });\n        return;\n      }\n\n      next();\n    }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 48,
+    "end_line": 62,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const key = this.getKey(req);",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const { allowed, remaining, resetTime } = this.check(key);",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "reset(key: string): void {\n    this.store.delete(key);\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 65,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "clear(): void {\n    this.store.clear();\n  }",
+    "file_path": "sample_repo/src/middleware/rateLimit.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "interface Request {\n      userId?: number;\n      isAdmin?: boolean;\n    }",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "function authMiddleware(req: Request, res: Response, next: NextFunction): void {\n  const token = req.headers.authorization?.split(\" \")[1];\n\n  if (!token) {\n    res.status(401).json({ message: \"Missing authorization token\" });\n    return;\n  }\n\n  // Mock JWT verification\n  try {\n    const payload = JSON.parse(Buffer.from(token, \"base64\").toString());\n    req.userId = payload.userId;\n    req.isAdmin = payload.isAdmin || false;\n    next();\n  } catch (error) {\n    res.status(401).json({ message: \"Invalid token\" });\n  }\n}",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "authMiddleware",
+    "start_line": 12,
+    "end_line": 29,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const token = req.headers.authorization?.split(\" \")[1];",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const payload = JSON.parse(Buffer.from(token, \"base64\").toString());",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 22,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function adminMiddleware(req: Request, res: Response, next: NextFunction): void {\n  if (!req.isAdmin) {\n    res.status(403).json({ message: \"Admin access required\" });\n    return;\n  }\n  next();\n}",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "adminMiddleware",
+    "start_line": 31,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): void {\n  console.error(err);\n  res.status(500).json({ message: \"Internal server error\" });\n}",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "errorHandler",
+    "start_line": 39,
+    "end_line": 42,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "function asyncHandler(fn: Function) {\n  return (req: Request, res: Response, next: NextFunction) => {\n    Promise.resolve(fn(req, res, next)).catch(next);\n  };\n}",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "asyncHandler",
+    "start_line": 44,
+    "end_line": 48,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "(req: Request, res: Response, next: NextFunction) => {\n    Promise.resolve(fn(req, res, next)).catch(next);\n  }",
+    "file_path": "sample_repo/src/middleware/auth.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 47,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {\n  const startTime = Date.now();\n\n  res.on(\"finish\", () => {\n    const duration = Date.now() - startTime;\n    const timestamp = new Date().toISOString();\n\n    console.log(\n      `[${timestamp}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`\n    );\n  });\n\n  next();\n}",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "loggingMiddleware",
+    "start_line": 3,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const startTime = Date.now();",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "() => {\n    const duration = Date.now() - startTime;\n    const timestamp = new Date().toISOString();\n\n    console.log(\n      `[${timestamp}] ${req.method} ${req.path} - ${res.statusCode} (${duration}ms)`\n    );\n  }",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "anonymous",
+    "start_line": 6,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const duration = Date.now() - startTime;",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 7,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const timestamp = new Date().toISOString();",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function requestValidationMiddleware(req: Request, res: Response, next: NextFunction): void {\n  // Check for required headers\n  const contentType = req.headers[\"content-type\"];\n\n  if ([\"POST\", \"PATCH\", \"PUT\"].includes(req.method) && !contentType?.includes(\"application/json\")) {\n    res.status(400).json({ message: \"Content-Type must be application/json\" });\n    return;\n  }\n\n  next();\n}",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "requestValidationMiddleware",
+    "start_line": 18,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const contentType = req.headers[\"content-type\"];",
+    "file_path": "sample_repo/src/middleware/logging.ts",
+    "function_name": "anonymous",
+    "start_line": 20,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface ApiResponse<T = unknown> {\n  success: boolean;\n  data?: T;\n  error?: string;\n  timestamp: number;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 6,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface PaginatedApiResponse<T> extends ApiResponse {\n  data: T[];\n  pagination: {\n    page: number;\n    limit: number;\n    total: number;\n    totalPages: number;\n  };\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface RequestContext {\n  requestId: string;\n  userId?: number;\n  timestamp: number;\n  ip: string;\n  userAgent: string;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface QueryFilters {\n  search?: string;\n  sort?: string;\n  order?: \"asc\" | \"desc\";\n  page?: number;\n  limit?: number;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface SortOptions {\n  field: string;\n  direction: \"asc\" | \"desc\";\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface FilterOptions {\n  field: string;\n  operator: \"eq\" | \"ne\" | \"gt\" | \"lt\" | \"gte\" | \"lte\" | \"in\" | \"contains\";\n  value: unknown;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 39,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "type HttpMethod = \"GET\" | \"POST\" | \"PUT\" | \"PATCH\" | \"DELETE\" | \"HEAD\";",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "type"
+  },
+  {
+    "content": "interface RequestLog {\n  method: HttpMethod;\n  path: string;\n  statusCode: number;\n  duration: number;\n  timestamp: Date;\n  userId?: number;\n  error?: string;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 47,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Entity {\n  id: number;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 57,
+    "end_line": 61,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface TimeRange {\n  startDate: Date;\n  endDate: Date;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 63,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface DateRange {\n  from: string;\n  to: string;\n}",
+    "file_path": "sample_repo/src/types/index.ts",
+    "function_name": "anonymous",
+    "start_line": 68,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "const API_VERSION = \"1.0.0\";",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 1,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const API_PORT = 3000;",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 2,
+    "end_line": 2,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const API_HOST = \"localhost\";",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 3,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const HTTP_STATUS = {\n  OK: 200,\n  CREATED: 201,\n  BAD_REQUEST: 400,\n  UNAUTHORIZED: 401,\n  FORBIDDEN: 403,\n  NOT_FOUND: 404,\n  INTERNAL_ERROR: 500,\n};",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const ORDER_STATUS = {\n  PENDING: \"pending\",\n  PROCESSING: \"processing\",\n  SHIPPED: \"shipped\",\n  DELIVERED: \"delivered\",\n  CANCELLED: \"cancelled\",\n};",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 21,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const USER_ROLES = {\n  ADMIN: \"admin\",\n  USER: \"user\",\n  GUEST: \"guest\",\n};",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const PAGINATION = {\n  DEFAULT_PAGE: 1,\n  DEFAULT_LIMIT: 20,\n  MAX_LIMIT: 100,\n};",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 33,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const ERROR_MESSAGES = {\n  NOT_FOUND: \"Resource not found\",\n  UNAUTHORIZED: \"Unauthorized access\",\n  INVALID_DATA: \"Invalid data provided\",\n  SERVER_ERROR: \"Internal server error\",\n};",
+    "file_path": "sample_repo/src/constants/config.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function generateToken(payload: Record<string, unknown>): string {\n  return Buffer.from(JSON.stringify(payload)).toString(\"base64\");\n}",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "generateToken",
+    "start_line": 1,
+    "end_line": 3,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "function verifyToken(token: string): Record<string, unknown> | null {\n  try {\n    return JSON.parse(Buffer.from(token, \"base64\").toString());\n  } catch (error) {\n    return null;\n  }\n}",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "verifyToken",
+    "start_line": 5,
+    "end_line": 11,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "function generateId(): number {\n  return Math.floor(Math.random() * 100000);\n}",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "generateId",
+    "start_line": 13,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "function validateEmail(email: string): boolean {\n  const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n  return emailRegex.test(email);\n}",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "validateEmail",
+    "start_line": 17,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function truncateString(str: string, maxLength: number): string {\n  if (str.length <= maxLength) return str;\n  return str.substring(0, maxLength) + \"...\";\n}",
+    "file_path": "sample_repo/src/utils/helpers.ts",
+    "function_name": "truncateString",
+    "start_line": 22,
+    "end_line": 25,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "interface PaginationParams {\n  page: number;\n  limit: number;\n  offset: number;\n}",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 7,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface PaginatedResponse<T> {\n  data: T[];\n  pagination: {\n    page: number;\n    limit: number;\n    total: number;\n    totalPages: number;\n  };\n}",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 17,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "function getPaginationParams(req: Request): PaginationParams {\n  let page = parseInt(req.query.page as string) || 1;\n  let limit = parseInt(req.query.limit as string) || 20;\n\n  page = Math.max(page, 1);\n  limit = Math.min(Math.max(limit, 1), 100);\n\n  return {\n    page,\n    limit,\n    offset: (page - 1) * limit,\n  };\n}",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "getPaginationParams",
+    "start_line": 19,
+    "end_line": 31,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "let page = parseInt(req.query.page as string) || 1;",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 20,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "let limit = parseInt(req.query.limit as string) || 20;",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 21,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function paginateArray<T>(items: T[], page: number, limit: number): PaginatedResponse<T> {\n  const total = items.length;\n  const offset = (page - 1) * limit;\n  const data = items.slice(offset, offset + limit);\n  const totalPages = Math.ceil(total / limit);\n\n  return {\n    data,\n    pagination: { page, limit, total, totalPages },\n  };\n}",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "paginateArray",
+    "start_line": 33,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const total = items.length;",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const offset = (page - 1) * limit;",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const data = items.slice(offset, offset + limit);",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 36,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const totalPages = Math.ceil(total / limit);",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "function paginationMiddleware(req: Request, res: Response, next: NextFunction): void {\n  const pagination = getPaginationParams(req);\n  (req as any).pagination = pagination;\n  next();\n}",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "paginationMiddleware",
+    "start_line": 45,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const pagination = getPaginationParams(req);",
+    "file_path": "sample_repo/src/utils/pagination.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "class ApiError extends Error {\n  constructor(public statusCode: number, public message: string, public details?: unknown) {\n    super(message);\n    this.name = \"ApiError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 6,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(public statusCode: number, public message: string, public details?: unknown) {\n    super(message);\n    this.name = \"ApiError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 2,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class ValidationError extends ApiError {\n  constructor(message: string, details?: unknown) {\n    super(400, message, details);\n    this.name = \"ValidationError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(message: string, details?: unknown) {\n    super(400, message, details);\n    this.name = \"ValidationError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class NotFoundError extends ApiError {\n  constructor(resource: string) {\n    super(404, `${resource} not found`);\n    this.name = \"NotFoundError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(resource: string) {\n    super(404, `${resource} not found`);\n    this.name = \"NotFoundError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 16,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class UnauthorizedError extends ApiError {\n  constructor(message: string = \"Unauthorized\") {\n    super(401, message);\n    this.name = \"UnauthorizedError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(message: string = \"Unauthorized\") {\n    super(401, message);\n    this.name = \"UnauthorizedError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class ForbiddenError extends ApiError {\n  constructor(message: string = \"Forbidden\") {\n    super(403, message);\n    this.name = \"ForbiddenError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(message: string = \"Forbidden\") {\n    super(403, message);\n    this.name = \"ForbiddenError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 30,
+    "end_line": 33,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class ConflictError extends ApiError {\n  constructor(message: string) {\n    super(409, message);\n    this.name = \"ConflictError\";\n  }\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 41,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(message: string) {\n    super(409, message);\n    this.name = \"ConflictError\";\n  }",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "function isApiError(error: unknown): error is ApiError {\n  return error instanceof ApiError;\n}",
+    "file_path": "sample_repo/src/utils/errors.ts",
+    "function_name": "isApiError",
+    "start_line": 43,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "interface MetricData {\n  timestamp: number;\n  value: number;\n}",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface AnalyticsSnapshot {\n  totalRequests: number;\n  totalErrors: number;\n  averageResponseTime: number;\n  uptime: number;\n  timestamp: number;\n}",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 6,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class Analytics {\n  private metrics: Map<string, MetricData[]> = new Map();\n  private startTime: number = Date.now();\n  private totalRequests: number = 0;\n  private totalErrors: number = 0;\n  private responseTimes: number[] = [];\n\n  recordRequest(): void {\n    this.totalRequests += 1;\n  }\n\n  recordError(): void {\n    this.totalErrors += 1;\n  }\n\n  recordResponseTime(ms: number): void {\n    this.responseTimes.push(ms);\n\n    // Keep only last 1000 measurements\n    if (this.responseTimes.length > 1000) {\n      this.responseTimes.shift();\n    }\n  }\n\n  recordMetric(name: string, value: number): void {\n    if (!this.metrics.has(name)) {\n      this.metrics.set(name, []);\n    }\n\n    this.metrics.get(name)!.push({\n      timestamp: Date.now(),\n      value,\n    });\n  }\n\n  getMetric(name: string, limit: number = 100): MetricData[] {\n    const data = this.metrics.get(name) || [];\n    return data.slice(-limit);\n  }\n\n  getSnapshot(): AnalyticsSnapshot {\n    const avgResponseTime =\n      this.responseTimes.length > 0\n        ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length\n        : 0;\n\n    return {\n      totalRequests: this.totalRequests,\n      totalErrors: this.totalErrors,\n      averageResponseTime: Math.round(avgResponseTime),\n      uptime: Math.floor((Date.now() - this.startTime) / 1000),\n      timestamp: Date.now(),\n    };\n  }\n\n  reset(): void {\n    this.totalRequests = 0;\n    this.totalErrors = 0;\n    this.responseTimes = [];\n    this.metrics.clear();\n    this.startTime = Date.now();\n  }\n}",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 76,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "recordRequest(): void {\n    this.totalRequests += 1;\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "recordError(): void {\n    this.totalErrors += 1;\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 25,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "recordResponseTime(ms: number): void {\n    this.responseTimes.push(ms);\n\n    // Keep only last 1000 measurements\n    if (this.responseTimes.length > 1000) {\n      this.responseTimes.shift();\n    }\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 36,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "recordMetric(name: string, value: number): void {\n    if (!this.metrics.has(name)) {\n      this.metrics.set(name, []);\n    }\n\n    this.metrics.get(name)!.push({\n      timestamp: Date.now(),\n      value,\n    });\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 38,
+    "end_line": 47,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "getMetric(name: string, limit: number = 100): MetricData[] {\n    const data = this.metrics.get(name) || [];\n    return data.slice(-limit);\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 52,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const data = this.metrics.get(name) || [];",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "getSnapshot(): AnalyticsSnapshot {\n    const avgResponseTime =\n      this.responseTimes.length > 0\n        ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length\n        : 0;\n\n    return {\n      totalRequests: this.totalRequests,\n      totalErrors: this.totalErrors,\n      averageResponseTime: Math.round(avgResponseTime),\n      uptime: Math.floor((Date.now() - this.startTime) / 1000),\n      timestamp: Date.now(),\n    };\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const avgResponseTime =\n      this.responseTimes.length > 0\n        ? this.responseTimes.reduce((a, b) => a + b, 0) / this.responseTimes.length\n        : 0;",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 55,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "reset(): void {\n    this.totalRequests = 0;\n    this.totalErrors = 0;\n    this.responseTimes = [];\n    this.metrics.clear();\n    this.startTime = Date.now();\n  }",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 75,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const analytics = new Analytics();",
+    "file_path": "sample_repo/src/utils/analytics.ts",
+    "function_name": "anonymous",
+    "start_line": 78,
+    "end_line": 78,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface EmailOptions {\n  to: string;\n  subject: string;\n  body: string;\n  from?: string;\n  cc?: string[];\n  bcc?: string[];\n}",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface SendResult {\n  success: boolean;\n  messageId?: string;\n  error?: string;\n}",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class EmailService {\n  private from: string = \"noreply@api.example.com\";\n\n  async send(options: EmailOptions): Promise<SendResult> {\n    try {\n      if (!this.isValidEmail(options.to)) {\n        return { success: false, error: \"Invalid recipient email\" };\n      }\n\n      // Simulate sending email\n      const messageId = `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;\n\n      console.log(`[EMAIL] To: ${options.to}`);\n      console.log(`[EMAIL] Subject: ${options.subject}`);\n      console.log(`[EMAIL] Message ID: ${messageId}`);\n\n      return { success: true, messageId };\n    } catch (error) {\n      return { success: false, error: String(error) };\n    }\n  }\n\n  async sendWelcome(email: string, name: string): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: \"Welcome to our API\",\n      body: `Hello ${name}, welcome to our platform!`,\n    });\n  }\n\n  async sendPasswordReset(email: string, resetToken: string): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: \"Password Reset\",\n      body: `Click here to reset your password: https://example.com/reset?token=${resetToken}`,\n    });\n  }\n\n  async sendOrderConfirmation(email: string, orderId: number): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: `Order Confirmation #${orderId}`,\n      body: `Your order #${orderId} has been confirmed. Thank you for your purchase!`,\n    });\n  }\n\n  private isValidEmail(email: string): boolean {\n    return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n  }\n}",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 16,
+    "end_line": 65,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async send(options: EmailOptions): Promise<SendResult> {\n    try {\n      if (!this.isValidEmail(options.to)) {\n        return { success: false, error: \"Invalid recipient email\" };\n      }\n\n      // Simulate sending email\n      const messageId = `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;\n\n      console.log(`[EMAIL] To: ${options.to}`);\n      console.log(`[EMAIL] Subject: ${options.subject}`);\n      console.log(`[EMAIL] Message ID: ${messageId}`);\n\n      return { success: true, messageId };\n    } catch (error) {\n      return { success: false, error: String(error) };\n    }\n  }",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 36,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const messageId = `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async sendWelcome(email: string, name: string): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: \"Welcome to our API\",\n      body: `Hello ${name}, welcome to our platform!`,\n    });\n  }",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 38,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async sendPasswordReset(email: string, resetToken: string): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: \"Password Reset\",\n      body: `Click here to reset your password: https://example.com/reset?token=${resetToken}`,\n    });\n  }",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 52,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async sendOrderConfirmation(email: string, orderId: number): Promise<SendResult> {\n    return this.send({\n      to: email,\n      subject: `Order Confirmation #${orderId}`,\n      body: `Your order #${orderId} has been confirmed. Thank you for your purchase!`,\n    });\n  }",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 60,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "private isValidEmail(email: string): boolean {\n    return /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email);\n  }",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 62,
+    "end_line": 64,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const emailService = new EmailService();",
+    "file_path": "sample_repo/src/utils/email.ts",
+    "function_name": "anonymous",
+    "start_line": 67,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface LogEntry {\n  timestamp: string;\n  level: string;\n  message: string;\n  data?: unknown;\n}",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class Logger {\n  private logs: LogEntry[] = [];\n  private level: LogLevel = LogLevel.INFO;\n\n  setLevel(level: LogLevel): void {\n    this.level = level;\n  }\n\n  debug(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.DEBUG) {\n      this.log(\"DEBUG\", message, data);\n    }\n  }\n\n  info(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.INFO) {\n      this.log(\"INFO\", message, data);\n    }\n  }\n\n  warn(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.WARN) {\n      this.log(\"WARN\", message, data);\n    }\n  }\n\n  error(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.ERROR) {\n      this.log(\"ERROR\", message, data);\n    }\n  }\n\n  private log(level: string, message: string, data?: unknown): void {\n    const entry: LogEntry = {\n      timestamp: new Date().toISOString(),\n      level,\n      message,\n      ...(data && { data }),\n    };\n\n    this.logs.push(entry);\n\n    // Keep only last 1000 logs\n    if (this.logs.length > 1000) {\n      this.logs.shift();\n    }\n\n    console.log(`[${level}] ${message}`, data ? data : \"\");\n  }\n\n  getLogs(limit: number = 100): LogEntry[] {\n    return this.logs.slice(-limit);\n  }\n\n  clearLogs(): void {\n    this.logs = [];\n  }\n}",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 72,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "setLevel(level: LogLevel): void {\n    this.level = level;\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 21,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "debug(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.DEBUG) {\n      this.log(\"DEBUG\", message, data);\n    }\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "info(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.INFO) {\n      this.log(\"INFO\", message, data);\n    }\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 33,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "warn(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.WARN) {\n      this.log(\"WARN\", message, data);\n    }\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 39,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "error(message: string, data?: unknown): void {\n    if (this.level <= LogLevel.ERROR) {\n      this.log(\"ERROR\", message, data);\n    }\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 41,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "private log(level: string, message: string, data?: unknown): void {\n    const entry: LogEntry = {\n      timestamp: new Date().toISOString(),\n      level,\n      message,\n      ...(data && { data }),\n    };\n\n    this.logs.push(entry);\n\n    // Keep only last 1000 logs\n    if (this.logs.length > 1000) {\n      this.logs.shift();\n    }\n\n    console.log(`[${level}] ${message}`, data ? data : \"\");\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 47,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const entry: LogEntry = {\n      timestamp: new Date().toISOString(),\n      level,\n      message,\n      ...(data && { data }),\n    };",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 48,
+    "end_line": 53,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "getLogs(limit: number = 100): LogEntry[] {\n    return this.logs.slice(-limit);\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 65,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "clearLogs(): void {\n    this.logs = [];\n  }",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const logger = new Logger();",
+    "file_path": "sample_repo/src/utils/logger.ts",
+    "function_name": "anonymous",
+    "start_line": 74,
+    "end_line": 74,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface CacheEntry {\n  key: string;\n  value: unknown;\n  expiresAt: number;\n}",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class CacheManager {\n  private cache: Map<string, CacheEntry> = new Map();\n\n  set(key: string, value: unknown, ttlSeconds: number = 3600): void {\n    const expiresAt = Date.now() + ttlSeconds * 1000;\n    this.cache.set(key, { key, value, expiresAt });\n  }\n\n  get(key: string): unknown {\n    const entry = this.cache.get(key);\n\n    if (!entry) return null;\n\n    if (entry.expiresAt < Date.now()) {\n      this.cache.delete(key);\n      return null;\n    }\n\n    return entry.value;\n  }\n\n  delete(key: string): boolean {\n    return this.cache.delete(key);\n  }\n\n  clear(): void {\n    this.cache.clear();\n  }\n\n  has(key: string): boolean {\n    const entry = this.cache.get(key);\n    if (!entry) return false;\n\n    if (entry.expiresAt < Date.now()) {\n      this.cache.delete(key);\n      return false;\n    }\n\n    return true;\n  }\n\n  getStats(): { size: number; keys: string[] } {\n    return {\n      size: this.cache.size,\n      keys: Array.from(this.cache.keys()),\n    };\n  }\n}",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "set(key: string, value: unknown, ttlSeconds: number = 3600): void {\n    const expiresAt = Date.now() + ttlSeconds * 1000;\n    this.cache.set(key, { key, value, expiresAt });\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const expiresAt = Date.now() + ttlSeconds * 1000;",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 11,
+    "end_line": 11,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "get(key: string): unknown {\n    const entry = this.cache.get(key);\n\n    if (!entry) return null;\n\n    if (entry.expiresAt < Date.now()) {\n      this.cache.delete(key);\n      return null;\n    }\n\n    return entry.value;\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const entry = this.cache.get(key);",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 16,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "delete(key: string): boolean {\n    return this.cache.delete(key);\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "clear(): void {\n    this.cache.clear();\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 32,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "has(key: string): boolean {\n    const entry = this.cache.get(key);\n    if (!entry) return false;\n\n    if (entry.expiresAt < Date.now()) {\n      this.cache.delete(key);\n      return false;\n    }\n\n    return true;\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const entry = this.cache.get(key);",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "getStats(): { size: number; keys: string[] } {\n    return {\n      size: this.cache.size,\n      keys: Array.from(this.cache.keys()),\n    };\n  }",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 48,
+    "end_line": 53,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const cache = new CacheManager();",
+    "file_path": "sample_repo/src/utils/cache.ts",
+    "function_name": "anonymous",
+    "start_line": 56,
+    "end_line": 56,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface ValidationError {\n  field: string;\n  message: string;\n}",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 6,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class Validator {\n  private errors: ValidationError[] = [];\n\n  validate(field: string, value: unknown, rules: string[]): this {\n    for (const rule of rules) {\n      const [ruleName, ...params] = rule.split(\":\");\n\n      switch (ruleName) {\n        case \"required\":\n          if (!value || (typeof value === \"string\" && value.trim() === \"\")) {\n            this.errors.push({ field, message: `${field} is required` });\n          }\n          break;\n\n        case \"email\":\n          if (value && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(value))) {\n            this.errors.push({ field, message: `${field} must be a valid email` });\n          }\n          break;\n\n        case \"min\":\n          if (value && String(value).length < parseInt(params[0])) {\n            this.errors.push({\n              field,\n              message: `${field} must be at least ${params[0]} characters`,\n            });\n          }\n          break;\n\n        case \"max\":\n          if (value && String(value).length > parseInt(params[0])) {\n            this.errors.push({\n              field,\n              message: `${field} must not exceed ${params[0]} characters`,\n            });\n          }\n          break;\n\n        case \"number\":\n          if (value && isNaN(Number(value))) {\n            this.errors.push({ field, message: `${field} must be a number` });\n          }\n          break;\n      }\n    }\n    return this;\n  }\n\n  hasErrors(): boolean {\n    return this.errors.length > 0;\n  }\n\n  getErrors(): ValidationError[] {\n    return this.errors;\n  }\n\n  clear(): void {\n    this.errors = [];\n  }\n}",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "validate(field: string, value: unknown, rules: string[]): this {\n    for (const rule of rules) {\n      const [ruleName, ...params] = rule.split(\":\");\n\n      switch (ruleName) {\n        case \"required\":\n          if (!value || (typeof value === \"string\" && value.trim() === \"\")) {\n            this.errors.push({ field, message: `${field} is required` });\n          }\n          break;\n\n        case \"email\":\n          if (value && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(String(value))) {\n            this.errors.push({ field, message: `${field} must be a valid email` });\n          }\n          break;\n\n        case \"min\":\n          if (value && String(value).length < parseInt(params[0])) {\n            this.errors.push({\n              field,\n              message: `${field} must be at least ${params[0]} characters`,\n            });\n          }\n          break;\n\n        case \"max\":\n          if (value && String(value).length > parseInt(params[0])) {\n            this.errors.push({\n              field,\n              message: `${field} must not exceed ${params[0]} characters`,\n            });\n          }\n          break;\n\n        case \"number\":\n          if (value && isNaN(Number(value))) {\n            this.errors.push({ field, message: `${field} must be a number` });\n          }\n          break;\n      }\n    }\n    return this;\n  }",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 11,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const [ruleName, ...params] = rule.split(\":\");",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "hasErrors(): boolean {\n    return this.errors.length > 0;\n  }",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 56,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "getErrors(): ValidationError[] {\n    return this.errors;\n  }",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 60,
+    "end_line": 62,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "clear(): void {\n    this.errors = [];\n  }",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 64,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "function validateUserInput(req: Request, res: Response, next: NextFunction): void {\n  const { name, email } = req.body;\n  const validator = new Validator();\n\n  validator\n    .validate(\"name\", name, [\"required\", \"min:2\", \"max:100\"])\n    .validate(\"email\", email, [\"required\", \"email\"]);\n\n  if (validator.hasErrors()) {\n    res.status(400).json({ errors: validator.getErrors() });\n    return;\n  }\n\n  next();\n}",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "validateUserInput",
+    "start_line": 69,
+    "end_line": 83,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { name, email } = req.body;",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 70,
+    "end_line": 70,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const validator = new Validator();",
+    "file_path": "sample_repo/src/utils/validators.ts",
+    "function_name": "anonymous",
+    "start_line": 71,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "interface Inventory {\n  id: number;\n  productId: number;\n  quantity: number;\n  reserved: number;\n  location: string;\n  sku: string;\n  lastRestocked: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 10,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface WareHouse {\n  id: number;\n  name: string;\n  location: string;\n  capacity: number;\n  currentLoad: number;\n}",
+    "file_path": "sample_repo/src/models/Inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 12,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface UpdateInventoryRequest {\n  quantity?: number;\n  location?: string;\n}",
+    "file_path": "sample_repo/src/models/Inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 20,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Category {\n  id: number;\n  name: string;\n  description: string;\n  slug: string;\n  parentCategoryId?: number;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Category.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface CreateCategoryRequest {\n  name: string;\n  description: string;\n  parentCategoryId?: number;\n}",
+    "file_path": "sample_repo/src/models/Category.ts",
+    "function_name": "anonymous",
+    "start_line": 11,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Payment {\n  id: number;\n  orderId: number;\n  amount: number;\n  method: \"credit_card\" | \"paypal\" | \"bank_transfer\" | \"cryptocurrency\";\n  status: \"pending\" | \"completed\" | \"failed\" | \"refunded\";\n  transactionId: string;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Payment.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 10,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface ProcessPaymentRequest {\n  orderId: number;\n  amount: number;\n  method: string;\n  cardToken?: string;\n}",
+    "file_path": "sample_repo/src/models/Payment.ts",
+    "function_name": "anonymous",
+    "start_line": 12,
+    "end_line": 17,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Product {\n  id: number;\n  name: string;\n  description: string;\n  price: number;\n  stock: number;\n  categoryId: number;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Product.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 10,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface CreateProductRequest {\n  name: string;\n  description: string;\n  price: number;\n  stock: number;\n  categoryId: number;\n}",
+    "file_path": "sample_repo/src/models/Product.ts",
+    "function_name": "anonymous",
+    "start_line": 12,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface UpdateProductRequest {\n  name?: string;\n  description?: string;\n  price?: number;\n  stock?: number;\n  categoryId?: number;\n}",
+    "file_path": "sample_repo/src/models/Product.ts",
+    "function_name": "anonymous",
+    "start_line": 20,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Review {\n  id: number;\n  productId: number;\n  userId: number;\n  rating: number;\n  title: string;\n  content: string;\n  helpful: number;\n  verified: boolean;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Review.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface CreateReviewRequest {\n  productId: number;\n  userId: number;\n  rating: number;\n  title: string;\n  content: string;\n}",
+    "file_path": "sample_repo/src/models/Review.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface OrderItem {\n  productId: number;\n  quantity: number;\n  price: number;\n}",
+    "file_path": "sample_repo/src/models/Order.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface Order {\n  id: number;\n  userId: number;\n  items: OrderItem[];\n  totalAmount: number;\n  status: \"pending\" | \"processing\" | \"shipped\" | \"delivered\" | \"cancelled\";\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/Order.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface CreateOrderRequest {\n  userId: number;\n  items: OrderItem[];\n}",
+    "file_path": "sample_repo/src/models/Order.ts",
+    "function_name": "anonymous",
+    "start_line": 17,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface HorseModel {\n    breed: string;\n}",
+    "file_path": "sample_repo/src/models/Order.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface UnicornModel {\n    color: string\n}",
+    "file_path": "sample_repo/src/models/Order.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface User {\n  id: number;\n  name: string;\n  email: string;\n  createdAt: Date;\n  updatedAt: Date;\n}",
+    "file_path": "sample_repo/src/models/User.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 7,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface CreateUserRequest {\n  name: string;\n  email: string;\n}",
+    "file_path": "sample_repo/src/models/User.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface UpdateUserRequest {\n  name?: string;\n  email?: string;\n}",
+    "file_path": "sample_repo/src/models/User.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 17,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "interface DatabaseConfig {\n  host: string;\n  port: number;\n  database: string;\n  username: string;\n  password: string;\n}",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 7,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class Database {\n  private config: DatabaseConfig;\n  private connected: boolean = false;\n\n  constructor(config: DatabaseConfig) {\n    this.config = config;\n  }\n\n  async connect(): Promise<void> {\n    try {\n      console.log(\n        `[DB] Connecting to ${this.config.database} at ${this.config.host}:${this.config.port}`\n      );\n\n      // Simulate connection\n      await new Promise((resolve) => setTimeout(resolve, 100));\n\n      this.connected = true;\n      console.log(\"[DB] Connected successfully\");\n    } catch (error) {\n      console.error(\"[DB] Connection failed:\", error);\n      throw error;\n    }\n  }\n\n  async disconnect(): Promise<void> {\n    if (this.connected) {\n      console.log(\"[DB] Disconnecting...\");\n      this.connected = false;\n    }\n  }\n\n  isConnected(): boolean {\n    return this.connected;\n  }\n\n  async migrate(): Promise<void> {\n    console.log(\"[DB] Running migrations...\");\n    console.log(\"[DB] Migrations completed\");\n  }\n\n  async seed(): Promise<void> {\n    console.log(\"[DB] Seeding database...\");\n    console.log(\"[DB] Database seeded\");\n  }\n}",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(config: DatabaseConfig) {\n    this.config = config;\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async connect(): Promise<void> {\n    try {\n      console.log(\n        `[DB] Connecting to ${this.config.database} at ${this.config.host}:${this.config.port}`\n      );\n\n      // Simulate connection\n      await new Promise((resolve) => setTimeout(resolve, 100));\n\n      this.connected = true;\n      console.log(\"[DB] Connected successfully\");\n    } catch (error) {\n      console.error(\"[DB] Connection failed:\", error);\n      throw error;\n    }\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 17,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(resolve) => setTimeout(resolve, 100)",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 24,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async disconnect(): Promise<void> {\n    if (this.connected) {\n      console.log(\"[DB] Disconnecting...\");\n      this.connected = false;\n    }\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 39,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "isConnected(): boolean {\n    return this.connected;\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 41,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async migrate(): Promise<void> {\n    console.log(\"[DB] Running migrations...\");\n    console.log(\"[DB] Migrations completed\");\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 48,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async seed(): Promise<void> {\n    console.log(\"[DB] Seeding database...\");\n    console.log(\"[DB] Database seeded\");\n  }",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 53,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const db = new Database({\n  host: \"localhost\",\n  port: 5432,\n  database: \"api_db\",\n  username: \"api_user\",\n  password: \"secure_password\",\n});",
+    "file_path": "sample_repo/src/db/connection.ts",
+    "function_name": "anonymous",
+    "start_line": 56,
+    "end_line": 62,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "class ProductController {\n  private productService: ProductService;\n\n  constructor(productService: ProductService) {\n    this.productService = productService;\n  }\n\n  async getAllProducts(req: Request, res: Response): Promise<void> {\n    try {\n      const { sort, order } = req.query;\n      let products = await this.productService.findAll();\n\n      if (sort === \"price\") {\n        products.sort((a, b) => (order === \"desc\" ? b.price - a.price : a.price - b.price));\n      }\n\n      res.json(products);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch products\" });\n    }\n  }\n\n  async getProductById(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const product = await this.productService.findById(Number(id));\n\n      if (!product) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.json(product);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch product\" });\n    }\n  }\n\n  async createProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const product = await this.productService.create(req.body);\n      res.status(201).json(product);\n    } catch (error) {\n      res.status(400).json({ message: \"Invalid product data\" });\n    }\n  }\n\n  async updateProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const product = await this.productService.update(Number(id), req.body);\n\n      if (!product) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.json(product);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to update product\" });\n    }\n  }\n\n  async deleteProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const success = await this.productService.delete(Number(id));\n\n      if (!success) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.status(204).send();\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to delete product\" });\n    }\n  }\n\n  async searchProducts(req: Request, res: Response): Promise<void> {\n    try {\n      const { query, minPrice, maxPrice } = req.query;\n      let products = await this.productService.findAll();\n\n      if (query) {\n        products = products.filter((p) =>\n          p.name.toLowerCase().includes(String(query).toLowerCase())\n        );\n      }\n\n      if (minPrice) {\n        products = products.filter((p) => p.price >= Number(minPrice));\n      }\n\n      if (maxPrice) {\n        products = products.filter((p) => p.price <= Number(maxPrice));\n      }\n\n      res.json(products);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to search products\" });\n    }\n  }\n}",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 107,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(productService: ProductService) {\n    this.productService = productService;\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async getAllProducts(req: Request, res: Response): Promise<void> {\n    try {\n      const { sort, order } = req.query;\n      let products = await this.productService.findAll();\n\n      if (sort === \"price\") {\n        products.sort((a, b) => (order === \"desc\" ? b.price - a.price : a.price - b.price));\n      }\n\n      res.json(products);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch products\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 11,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { sort, order } = req.query;",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "let products = await this.productService.findAll();",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(a, b) => (order === \"desc\" ? b.price - a.price : a.price - b.price)",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 17,
+    "end_line": 17,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async getProductById(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const product = await this.productService.findById(Number(id));\n\n      if (!product) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.json(product);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch product\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const product = await this.productService.findById(Number(id));",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 29,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async createProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const product = await this.productService.create(req.body);\n      res.status(201).json(product);\n    } catch (error) {\n      res.status(400).json({ message: \"Invalid product data\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 42,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const product = await this.productService.create(req.body);",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 44,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async updateProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const product = await this.productService.update(Number(id), req.body);\n\n      if (!product) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.json(product);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to update product\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 51,
+    "end_line": 65,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 53,
+    "end_line": 53,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const product = await this.productService.update(Number(id), req.body);",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async deleteProduct(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const success = await this.productService.delete(Number(id));\n\n      if (!success) {\n        res.status(404).json({ message: \"Product not found\" });\n        return;\n      }\n\n      res.status(204).send();\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to delete product\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 67,
+    "end_line": 81,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 69,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await this.productService.delete(Number(id));",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 70,
+    "end_line": 70,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async searchProducts(req: Request, res: Response): Promise<void> {\n    try {\n      const { query, minPrice, maxPrice } = req.query;\n      let products = await this.productService.findAll();\n\n      if (query) {\n        products = products.filter((p) =>\n          p.name.toLowerCase().includes(String(query).toLowerCase())\n        );\n      }\n\n      if (minPrice) {\n        products = products.filter((p) => p.price >= Number(minPrice));\n      }\n\n      if (maxPrice) {\n        products = products.filter((p) => p.price <= Number(maxPrice));\n      }\n\n      res.json(products);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to search products\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 83,
+    "end_line": 106,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { query, minPrice, maxPrice } = req.query;",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 85,
+    "end_line": 85,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "let products = await this.productService.findAll();",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 86,
+    "end_line": 86,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(p) =>\n          p.name.toLowerCase().includes(String(query).toLowerCase())",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 89,
+    "end_line": 90,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "(p) => p.price >= Number(minPrice)",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 95,
+    "end_line": 95,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "(p) => p.price <= Number(maxPrice)",
+    "file_path": "sample_repo/src/controllers/productController.ts",
+    "function_name": "anonymous",
+    "start_line": 99,
+    "end_line": 99,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "class UserController {\n  private userService: UserService;\n\n  constructor(userService: UserService) {\n    this.userService = userService;\n  }\n\n  async getAllUsers(req: Request, res: Response): Promise<void> {\n    try {\n      const users = await this.userService.findAll();\n      res.json(users);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch users\" });\n    }\n  }\n\n  async getUserById(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const user = await this.userService.findById(Number(id));\n\n      if (!user) {\n        res.status(404).json({ message: \"User not found\" });\n        return;\n      }\n\n      res.json(user);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch user\" });\n    }\n  }\n\n  async createUser(req: Request, res: Response): Promise<void> {\n    try {\n      const user = await this.userService.findById(req.body.id);\n\n      if (user) {\n        res.status(400).json({ message: \"User already exists\" });\n        return;\n      }\n\n      const newUser = await this.userService.create(req.body);\n      res.status(201).json(newUser);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to create user\" });\n    }\n  }\n\n  async deleteUser(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const success = await this.userService.deleteUser(Number(id));\n\n      if (!success) {\n        res.status(404).json({ message: \"User not found\" });\n        return;\n      }\n\n      res.status(204).send();\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to delete user\" });\n    }\n  }\n\n  async searchUsers(req: Request, res: Response): Promise<void> {\n    try {\n      const { query } = req.query;\n      const users = await this.userService.findAll();\n\n      const filtered = users.filter((u) =>\n        u.name.toLowerCase().includes(String(query).toLowerCase())\n      );\n\n      res.json(filtered);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to search users\" });\n    }\n  }\n}",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 82,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "constructor(userService: UserService) {\n    this.userService = userService;\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async getAllUsers(req: Request, res: Response): Promise<void> {\n    try {\n      const users = await this.userService.findAll();\n      res.json(users);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch users\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 11,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const users = await this.userService.findAll();",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async getUserById(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const user = await this.userService.findById(Number(id));\n\n      if (!user) {\n        res.status(404).json({ message: \"User not found\" });\n        return;\n      }\n\n      res.json(user);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to fetch user\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 20,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 22,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const user = await this.userService.findById(Number(id));",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async createUser(req: Request, res: Response): Promise<void> {\n    try {\n      const user = await this.userService.findById(req.body.id);\n\n      if (user) {\n        res.status(400).json({ message: \"User already exists\" });\n        return;\n      }\n\n      const newUser = await this.userService.create(req.body);\n      res.status(201).json(newUser);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to create user\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const user = await this.userService.findById(req.body.id);",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 38,
+    "end_line": 38,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const newUser = await this.userService.create(req.body);",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async deleteUser(req: Request, res: Response): Promise<void> {\n    try {\n      const { id } = req.params;\n      const success = await this.userService.deleteUser(Number(id));\n\n      if (!success) {\n        res.status(404).json({ message: \"User not found\" });\n        return;\n      }\n\n      res.status(204).send();\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to delete user\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 52,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await this.userService.deleteUser(Number(id));",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 55,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async searchUsers(req: Request, res: Response): Promise<void> {\n    try {\n      const { query } = req.query;\n      const users = await this.userService.findAll();\n\n      const filtered = users.filter((u) =>\n        u.name.toLowerCase().includes(String(query).toLowerCase())\n      );\n\n      res.json(filtered);\n    } catch (error) {\n      res.status(500).json({ message: \"Failed to search users\" });\n    }\n  }",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 68,
+    "end_line": 81,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const { query } = req.query;",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 70,
+    "end_line": 70,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const users = await this.userService.findAll();",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 71,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const filtered = users.filter((u) =>\n        u.name.toLowerCase().includes(String(query).toLowerCase())\n      );",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 73,
+    "end_line": 75,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(u) =>\n        u.name.toLowerCase().includes(String(query).toLowerCase())",
+    "file_path": "sample_repo/src/controllers/userController.ts",
+    "function_name": "anonymous",
+    "start_line": 73,
+    "end_line": 74,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const inventoryService = new InventoryService();",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getInventory(req: Request, res: Response): Promise<void> {\n  try {\n    const inventory = await inventoryService.findAll();\n    res.json(inventory);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch inventory\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "getInventory",
+    "start_line": 7,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const inventory = await inventoryService.findAll();",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getInventoryByProduct(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId } = req.params;\n    const item = await inventoryService.findByProductId(Number(productId));\n\n    if (!item) {\n      res.status(404).json({ message: \"Inventory item not found\" });\n      return;\n    }\n\n    res.json(item);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch inventory\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "getInventoryByProduct",
+    "start_line": 16,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId } = req.params;",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const item = await inventoryService.findByProductId(Number(productId));",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function reserveStock(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId, quantity } = req.body;\n    const success = await inventoryService.reserve(productId, quantity);\n\n    if (!success) {\n      res.status(400).json({ message: \"Insufficient stock\" });\n      return;\n    }\n\n    res.json({ message: \"Stock reserved successfully\" });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to reserve stock\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "reserveStock",
+    "start_line": 32,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId, quantity } = req.body;",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await inventoryService.reserve(productId, quantity);",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function releaseReservation(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId, quantity } = req.body;\n    const success = await inventoryService.releaseReservation(productId, quantity);\n\n    if (!success) {\n      res.status(400).json({ message: \"Failed to release reservation\" });\n      return;\n    }\n\n    res.json({ message: \"Reservation released successfully\" });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to release reservation\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "releaseReservation",
+    "start_line": 48,
+    "end_line": 62,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId, quantity } = req.body;",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await inventoryService.releaseReservation(productId, quantity);",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 51,
+    "end_line": 51,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function updateInventory(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId } = req.params;\n    const item = await inventoryService.updateStock(Number(productId), req.body);\n\n    if (!item) {\n      res.status(404).json({ message: \"Inventory item not found\" });\n      return;\n    }\n\n    res.json(item);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to update inventory\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "updateInventory",
+    "start_line": 64,
+    "end_line": 78,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId } = req.params;",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 66,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const item = await inventoryService.updateStock(Number(productId), req.body);",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 67,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getLowStock(req: Request, res: Response): Promise<void> {\n  try {\n    const threshold = req.query.threshold ? Number(req.query.threshold) : 10;\n    const items = await inventoryService.getLowStockItems(threshold);\n    res.json(items);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch low stock items\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "getLowStock",
+    "start_line": 80,
+    "end_line": 88,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const threshold = req.query.threshold ? Number(req.query.threshold) : 10;",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 82,
+    "end_line": 82,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const items = await inventoryService.getLowStockItems(threshold);",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 83,
+    "end_line": 83,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getWarehouses(req: Request, res: Response): Promise<void> {\n  try {\n    const warehouses = await inventoryService.getWarehouses();\n    res.json(warehouses);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch warehouses\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "getWarehouses",
+    "start_line": 90,
+    "end_line": 97,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const warehouses = await inventoryService.getWarehouses();",
+    "file_path": "sample_repo/src/routes/inventory.ts",
+    "function_name": "anonymous",
+    "start_line": 92,
+    "end_line": 92,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getStats(req: Request, res: Response): Promise<void> {\n  try {\n    const snapshot = analytics.getSnapshot();\n    res.json(snapshot);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch stats\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "getStats",
+    "start_line": 7,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const snapshot = analytics.getSnapshot();",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getMetrics(req: Request, res: Response): Promise<void> {\n  try {\n    const { name, limit } = req.query;\n\n    if (!name) {\n      res.status(400).json({ message: \"Metric name required\" });\n      return;\n    }\n\n    const metrics = analytics.getMetric(String(name), limit ? Number(limit) : 100);\n    res.json({ metric: name, data: metrics });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch metrics\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "getMetrics",
+    "start_line": 16,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { name, limit } = req.query;",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const metrics = analytics.getMetric(String(name), limit ? Number(limit) : 100);",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 25,
+    "end_line": 25,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getLogs(req: Request, res: Response): Promise<void> {\n  try {\n    const { limit } = req.query;\n    const logs = logger.getLogs(limit ? Number(limit) : 100);\n    res.json(logs);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch logs\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "getLogs",
+    "start_line": 32,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { limit } = req.query;",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const logs = logger.getLogs(limit ? Number(limit) : 100);",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function setLogLevel(req: Request, res: Response): Promise<void> {\n  try {\n    const { level } = req.body;\n\n    if (![\"DEBUG\", \"INFO\", \"WARN\", \"ERROR\"].includes(level)) {\n      res.status(400).json({ message: \"Invalid log level\" });\n      return;\n    }\n\n    logger.setLevel(LogLevel[level as keyof typeof LogLevel]);\n    res.json({ message: `Log level set to ${level}` });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to set log level\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "setLogLevel",
+    "start_line": 42,
+    "end_line": 56,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { level } = req.body;",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 44,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getSystemInfo(req: Request, res: Response): Promise<void> {\n  try {\n    const info = {\n      nodeVersion: process.version,\n      platform: process.platform,\n      architecture: process.arch,\n      memoryUsage: process.memoryUsage(),\n      uptime: process.uptime(),\n    };\n\n    res.json(info);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch system info\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "getSystemInfo",
+    "start_line": 58,
+    "end_line": 72,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const info = {\n      nodeVersion: process.version,\n      platform: process.platform,\n      architecture: process.arch,\n      memoryUsage: process.memoryUsage(),\n      uptime: process.uptime(),\n    };",
+    "file_path": "sample_repo/src/routes/admin.ts",
+    "function_name": "anonymous",
+    "start_line": 60,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const productService = new ProductService();",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getProducts(req: Request, res: Response): Promise<void> {\n  const { categoryId } = req.query;\n  let products;\n\n  if (categoryId) {\n    products = await productService.findByCategory(Number(categoryId));\n  } else {\n    products = await productService.findAll();\n  }\n\n  res.json(products);\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "getProducts",
+    "start_line": 7,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { categoryId } = req.query;",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getProductById(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const product = await productService.findById(Number(id));\n\n  if (!product) {\n    res.status(404).json({ message: \"Product not found\" });\n    return;\n  }\n\n  res.json(product);\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "getProductById",
+    "start_line": 20,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 21,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const product = await productService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 22,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function createProduct(req: Request, res: Response): Promise<void> {\n  try {\n    const product = await productService.create(req.body);\n    res.status(201).json(product);\n  } catch (error) {\n    res.status(400).json({ message: \"Invalid product data\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "createProduct",
+    "start_line": 32,
+    "end_line": 39,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const product = await productService.create(req.body);",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function updateProduct(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const product = await productService.update(Number(id), req.body);\n\n  if (!product) {\n    res.status(404).json({ message: \"Product not found\" });\n    return;\n  }\n\n  res.json(product);\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "updateProduct",
+    "start_line": 41,
+    "end_line": 51,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 42,
+    "end_line": 42,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const product = await productService.update(Number(id), req.body);",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 43,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function deleteProduct(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const success = await productService.delete(Number(id));\n\n  if (!success) {\n    res.status(404).json({ message: \"Product not found\" });\n    return;\n  }\n\n  res.status(204).send();\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "deleteProduct",
+    "start_line": 53,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await productService.delete(Number(id));",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 55,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getInStockProducts(req: Request, res: Response): Promise<void> {\n  const products = await productService.getInStock();\n  res.json(products);\n}",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "getInStockProducts",
+    "start_line": 65,
+    "end_line": 68,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const products = await productService.getInStock();",
+    "file_path": "sample_repo/src/routes/products.ts",
+    "function_name": "anonymous",
+    "start_line": 66,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const orderService = new OrderService();",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getOrders(req: Request, res: Response): Promise<void> {\n  const { userId, days } = req.query;\n  let orders;\n\n  if (userId) {\n    orders = await orderService.findByUserId(Number(userId));\n  } else if (days) {\n    orders = await orderService.getRecentOrders(Number(days));\n  } else {\n    orders = await orderService.findAll();\n  }\n\n  res.json(orders);\n}",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "getOrders",
+    "start_line": 7,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { userId, days } = req.query;",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getOrderById(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const order = await orderService.findById(Number(id));\n\n  if (!order) {\n    res.status(404).json({ message: \"Order not found\" });\n    return;\n  }\n\n  res.json(order);\n}",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "getOrderById",
+    "start_line": 22,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const order = await orderService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 24,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function createOrder(req: Request, res: Response): Promise<void> {\n  try {\n    const order = await orderService.create(req.body);\n    res.status(201).json(order);\n  } catch (error) {\n    res.status(400).json({ message: \"Invalid order data\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "createOrder",
+    "start_line": 34,
+    "end_line": 41,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const order = await orderService.create(req.body);",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 36,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function updateOrderStatus(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const { status } = req.body;\n\n  const order = await orderService.updateStatus(Number(id), status);\n\n  if (!order) {\n    res.status(404).json({ message: \"Order not found\" });\n    return;\n  }\n\n  res.json(order);\n}",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "updateOrderStatus",
+    "start_line": 43,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 44,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const { status } = req.body;",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const order = await orderService.updateStatus(Number(id), status);",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 47,
+    "end_line": 47,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function cancelOrder(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const order = await orderService.cancel(Number(id));\n\n  if (!order) {\n    res.status(404).json({ message: \"Order not found or cannot be cancelled\" });\n    return;\n  }\n\n  res.json(order);\n}",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "cancelOrder",
+    "start_line": 57,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const order = await orderService.cancel(Number(id));",
+    "file_path": "sample_repo/src/routes/orders.ts",
+    "function_name": "anonymous",
+    "start_line": 59,
+    "end_line": 59,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const categoryService = new CategoryService();",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getCategories(req: Request, res: Response): Promise<void> {\n  try {\n    const categories = await categoryService.findAll();\n    res.json(categories);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch categories\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "getCategories",
+    "start_line": 7,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const categories = await categoryService.findAll();",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getCategoryById(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const category = await categoryService.findById(Number(id));\n\n    if (!category) {\n      res.status(404).json({ message: \"Category not found\" });\n      return;\n    }\n\n    res.json(category);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch category\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "getCategoryById",
+    "start_line": 16,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 18,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const category = await categoryService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getCategoryBySlug(req: Request, res: Response): Promise<void> {\n  try {\n    const { slug } = req.params;\n    const category = await categoryService.findBySlug(slug);\n\n    if (!category) {\n      res.status(404).json({ message: \"Category not found\" });\n      return;\n    }\n\n    res.json(category);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch category\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "getCategoryBySlug",
+    "start_line": 32,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { slug } = req.params;",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const category = await categoryService.findBySlug(slug);",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function createCategory(req: Request, res: Response): Promise<void> {\n  try {\n    const category = await categoryService.create(req.body);\n    res.status(201).json(category);\n  } catch (error) {\n    res.status(400).json({ message: \"Failed to create category\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "createCategory",
+    "start_line": 48,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const category = await categoryService.create(req.body);",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function updateCategory(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const category = await categoryService.update(Number(id), req.body);\n\n    if (!category) {\n      res.status(404).json({ message: \"Category not found\" });\n      return;\n    }\n\n    res.json(category);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to update category\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "updateCategory",
+    "start_line": 57,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 59,
+    "end_line": 59,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const category = await categoryService.update(Number(id), req.body);",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 60,
+    "end_line": 60,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function deleteCategory(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const success = await categoryService.delete(Number(id));\n\n    if (!success) {\n      res.status(404).json({ message: \"Category not found\" });\n      return;\n    }\n\n    res.status(204).send();\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to delete category\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "deleteCategory",
+    "start_line": 73,
+    "end_line": 87,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 75,
+    "end_line": 75,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await categoryService.delete(Number(id));",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 76,
+    "end_line": 76,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getSubcategories(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const subcategories = await categoryService.getSubcategories(Number(id));\n    res.json(subcategories);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch subcategories\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "getSubcategories",
+    "start_line": 89,
+    "end_line": 97,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 91,
+    "end_line": 91,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const subcategories = await categoryService.getSubcategories(Number(id));",
+    "file_path": "sample_repo/src/routes/categories.ts",
+    "function_name": "anonymous",
+    "start_line": 92,
+    "end_line": 92,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const userService = new UserService();",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getUsers(req: Request, res: Response): Promise<void> {\n  const users = await userService.findAll();\n  res.json(users);\n}",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "getUsers",
+    "start_line": 7,
+    "end_line": 10,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const users = await userService.findAll();",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 8,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getUserById(req: Request, res: Response): Promise<void> {\n  const { id } = req.params;\n  const user = await userService.findById(Number(id));\n  if (!user) {\n    res.status(404).json({ message: \"User not found\" });\n    return;\n  }\n  res.json(user);\n}",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "getUserById",
+    "start_line": 12,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 13,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const user = await userService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 14,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function createUser(req: Request, res: Response): Promise<void> {\n  const user = await userService.create(req.body);\n  res.status(201).json(user);\n}",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "createUser",
+    "start_line": 22,
+    "end_line": 25,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const user = await userService.create(req.body);",
+    "file_path": "sample_repo/src/routes/users.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const paymentService = new PaymentService();",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getPayments(req: Request, res: Response): Promise<void> {\n  try {\n    const { status } = req.query;\n    let payments;\n\n    if (status) {\n      payments = await paymentService.getPaymentsByStatus(status as any);\n    } else {\n      payments = await paymentService.findAll();\n    }\n\n    res.json(payments);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch payments\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "getPayments",
+    "start_line": 7,
+    "end_line": 22,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { status } = req.query;",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getPaymentById(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const payment = await paymentService.findById(Number(id));\n\n    if (!payment) {\n      res.status(404).json({ message: \"Payment not found\" });\n      return;\n    }\n\n    res.json(payment);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch payment\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "getPaymentById",
+    "start_line": 24,
+    "end_line": 38,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 26,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const payment = await paymentService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 27,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getPaymentByOrder(req: Request, res: Response): Promise<void> {\n  try {\n    const { orderId } = req.params;\n    const payment = await paymentService.findByOrderId(Number(orderId));\n\n    if (!payment) {\n      res.status(404).json({ message: \"Payment not found for this order\" });\n      return;\n    }\n\n    res.json(payment);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch payment\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "getPaymentByOrder",
+    "start_line": 40,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { orderId } = req.params;",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 42,
+    "end_line": 42,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const payment = await paymentService.findByOrderId(Number(orderId));",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 43,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function processPayment(req: Request, res: Response): Promise<void> {\n  try {\n    const payment = await paymentService.processPayment(req.body);\n    res.status(201).json(payment);\n  } catch (error) {\n    res.status(400).json({ message: \"Failed to process payment\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "processPayment",
+    "start_line": 56,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const payment = await paymentService.processPayment(req.body);",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function refundPayment(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const payment = await paymentService.refund(Number(id));\n\n    if (!payment) {\n      res.status(404).json({ message: \"Payment not found\" });\n      return;\n    }\n\n    res.json(payment);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to process refund\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "refundPayment",
+    "start_line": 65,
+    "end_line": 79,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 67,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const payment = await paymentService.refund(Number(id));",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 68,
+    "end_line": 68,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getRevenue(req: Request, res: Response): Promise<void> {\n  try {\n    const revenue = await paymentService.getTotalRevenue();\n    res.json({ totalRevenue: revenue });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to calculate revenue\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "getRevenue",
+    "start_line": 81,
+    "end_line": 88,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const revenue = await paymentService.getTotalRevenue();",
+    "file_path": "sample_repo/src/routes/payments.ts",
+    "function_name": "anonymous",
+    "start_line": 83,
+    "end_line": 83,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const router = Router();",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 4,
+    "end_line": 4,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const reviewService = new ReviewService();",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 5,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getReviews(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId, userId } = req.query;\n    let reviews;\n\n    if (productId) {\n      reviews = await reviewService.findByProductId(Number(productId));\n    } else if (userId) {\n      reviews = await reviewService.findByUserId(Number(userId));\n    } else {\n      reviews = await reviewService.findAll();\n    }\n\n    res.json(reviews);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch reviews\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "getReviews",
+    "start_line": 7,
+    "end_line": 24,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId, userId } = req.query;",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 9,
+    "end_line": 9,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getReviewById(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const review = await reviewService.findById(Number(id));\n\n    if (!review) {\n      res.status(404).json({ message: \"Review not found\" });\n      return;\n    }\n\n    res.json(review);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to fetch review\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "getReviewById",
+    "start_line": 26,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const review = await reviewService.findById(Number(id));",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 29,
+    "end_line": 29,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function createReview(req: Request, res: Response): Promise<void> {\n  try {\n    const review = await reviewService.create(req.body);\n    res.status(201).json(review);\n  } catch (error) {\n    res.status(400).json({ message: \"Failed to create review\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "createReview",
+    "start_line": 42,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const review = await reviewService.create(req.body);",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 44,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function markHelpful(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const review = await reviewService.markHelpful(Number(id));\n\n    if (!review) {\n      res.status(404).json({ message: \"Review not found\" });\n      return;\n    }\n\n    res.json(review);\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to mark review as helpful\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "markHelpful",
+    "start_line": 51,
+    "end_line": 65,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 53,
+    "end_line": 53,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const review = await reviewService.markHelpful(Number(id));",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function getAverageRating(req: Request, res: Response): Promise<void> {\n  try {\n    const { productId } = req.params;\n    const rating = await reviewService.getAverageRating(Number(productId));\n    res.json({ productId, averageRating: rating });\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to calculate rating\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "getAverageRating",
+    "start_line": 67,
+    "end_line": 75,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { productId } = req.params;",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 69,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const rating = await reviewService.getAverageRating(Number(productId));",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 70,
+    "end_line": 70,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async function deleteReview(req: Request, res: Response): Promise<void> {\n  try {\n    const { id } = req.params;\n    const success = await reviewService.delete(Number(id));\n\n    if (!success) {\n      res.status(404).json({ message: \"Review not found\" });\n      return;\n    }\n\n    res.status(204).send();\n  } catch (error) {\n    res.status(500).json({ message: \"Failed to delete review\" });\n  }\n}",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "deleteReview",
+    "start_line": 77,
+    "end_line": 91,
+    "language": "typescript",
+    "chunk_type": "function"
+  },
+  {
+    "content": "const { id } = req.params;",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 79,
+    "end_line": 79,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const success = await reviewService.delete(Number(id));",
+    "file_path": "sample_repo/src/routes/reviews.ts",
+    "function_name": "anonymous",
+    "start_line": 80,
+    "end_line": 80,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "class OrderService {\n  private orders: Order[] = [\n    {\n      id: 1,\n      userId: 1,\n      items: [\n        { productId: 1, quantity: 1, price: 1299.99 },\n        { productId: 2, quantity: 2, price: 29.99 },\n      ],\n      totalAmount: 1359.97,\n      status: \"delivered\",\n      createdAt: new Date(\"2024-01-15\"),\n      updatedAt: new Date(\"2024-01-20\"),\n    },\n  ];\n\n  async findAll(): Promise<Order[]> {\n    return this.orders;\n  }\n\n  async findById(id: number): Promise<Order | undefined> {\n    return this.orders.find((o) => o.id === id);\n  }\n\n  async findByUserId(userId: number): Promise<Order[]> {\n    return this.orders.filter((o) => o.userId === userId);\n  }\n\n  async create(data: CreateOrderRequest): Promise<Order> {\n    const totalAmount = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n\n    const newOrder: Order = {\n      id: Math.max(...this.orders.map((o) => o.id), 0) + 1,\n      ...data,\n      totalAmount,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.orders.push(newOrder);\n    return newOrder;\n  }\n\n  async updateStatus(id: number, status: Order[\"status\"]): Promise<Order | undefined> {\n    const order = this.orders.find((o) => o.id === id);\n    if (!order) return undefined;\n\n    order.status = status;\n    order.updatedAt = new Date();\n    return order;\n  }\n\n  async cancel(id: number): Promise<Order | undefined> {\n    const order = this.orders.find((o) => o.id === id);\n    if (!order || order.status !== \"pending\") return undefined;\n\n    order.status = \"cancelled\";\n    order.updatedAt = new Date();\n    return order;\n  }\n\n  async getRecentOrders(days: number = 30): Promise<Order[]> {\n    const cutoffDate = new Date();\n    cutoffDate.setDate(cutoffDate.getDate() - days);\n\n    return this.orders.filter((o) => o.createdAt >= cutoffDate);\n  }\n}",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 71,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Order[]> {\n    return this.orders;\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 21,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<Order | undefined> {\n    return this.orders.find((o) => o.id === id);\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 25,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findByUserId(userId: number): Promise<Order[]> {\n    return this.orders.filter((o) => o.userId === userId);\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 27,
+    "end_line": 29,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(o) => o.userId === userId",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async create(data: CreateOrderRequest): Promise<Order> {\n    const totalAmount = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);\n\n    const newOrder: Order = {\n      id: Math.max(...this.orders.map((o) => o.id), 0) + 1,\n      ...data,\n      totalAmount,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.orders.push(newOrder);\n    return newOrder;\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 31,
+    "end_line": 45,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const totalAmount = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 32,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(sum, item) => sum + item.price * item.quantity",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 32,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const newOrder: Order = {\n      id: Math.max(...this.orders.map((o) => o.id), 0) + 1,\n      ...data,\n      totalAmount,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 41,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async updateStatus(id: number, status: Order[\"status\"]): Promise<Order | undefined> {\n    const order = this.orders.find((o) => o.id === id);\n    if (!order) return undefined;\n\n    order.status = status;\n    order.updatedAt = new Date();\n    return order;\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 47,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const order = this.orders.find((o) => o.id === id);",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 48,
+    "end_line": 48,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async cancel(id: number): Promise<Order | undefined> {\n    const order = this.orders.find((o) => o.id === id);\n    if (!order || order.status !== \"pending\") return undefined;\n\n    order.status = \"cancelled\";\n    order.updatedAt = new Date();\n    return order;\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 56,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const order = this.orders.find((o) => o.id === id);",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 57,
+    "end_line": 57,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async getRecentOrders(days: number = 30): Promise<Order[]> {\n    const cutoffDate = new Date();\n    cutoffDate.setDate(cutoffDate.getDate() - days);\n\n    return this.orders.filter((o) => o.createdAt >= cutoffDate);\n  }",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 65,
+    "end_line": 70,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const cutoffDate = new Date();",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 66,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(o) => o.createdAt >= cutoffDate",
+    "file_path": "sample_repo/src/services/orderService.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 69,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "class ReviewService {\n  private reviews: Review[] = [];\n\n  async findAll(): Promise<Review[]> {\n    return this.reviews;\n  }\n\n  async findById(id: number): Promise<Review | undefined> {\n    return this.reviews.find((r) => r.id === id);\n  }\n\n  async findByProductId(productId: number): Promise<Review[]> {\n    return this.reviews.filter((r) => r.productId === productId);\n  }\n\n  async findByUserId(userId: number): Promise<Review[]> {\n    return this.reviews.filter((r) => r.userId === userId);\n  }\n\n  async create(data: CreateReviewRequest): Promise<Review> {\n    const newReview: Review = {\n      id: Math.max(...this.reviews.map((r) => r.id), 0) + 1,\n      ...data,\n      helpful: 0,\n      verified: true,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.reviews.push(newReview);\n    return newReview;\n  }\n\n  async markHelpful(id: number): Promise<Review | undefined> {\n    const review = this.reviews.find((r) => r.id === id);\n    if (!review) return undefined;\n\n    review.helpful += 1;\n    review.updatedAt = new Date();\n    return review;\n  }\n\n  async getAverageRating(productId: number): Promise<number> {\n    const productReviews = this.reviews.filter((r) => r.productId === productId);\n    if (productReviews.length === 0) return 0;\n\n    const sum = productReviews.reduce((acc, r) => acc + r.rating, 0);\n    return sum / productReviews.length;\n  }\n\n  async delete(id: number): Promise<boolean> {\n    const index = this.reviews.findIndex((r) => r.id === id);\n    if (index === -1) return false;\n    this.reviews.splice(index, 1);\n    return true;\n  }\n}",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 59,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Review[]> {\n    return this.reviews;\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 6,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<Review | undefined> {\n    return this.reviews.find((r) => r.id === id);\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findByProductId(productId: number): Promise<Review[]> {\n    return this.reviews.filter((r) => r.productId === productId);\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(r) => r.productId === productId",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async findByUserId(userId: number): Promise<Review[]> {\n    return this.reviews.filter((r) => r.userId === userId);\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(r) => r.userId === userId",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async create(data: CreateReviewRequest): Promise<Review> {\n    const newReview: Review = {\n      id: Math.max(...this.reviews.map((r) => r.id), 0) + 1,\n      ...data,\n      helpful: 0,\n      verified: true,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.reviews.push(newReview);\n    return newReview;\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const newReview: Review = {\n      id: Math.max(...this.reviews.map((r) => r.id), 0) + 1,\n      ...data,\n      helpful: 0,\n      verified: true,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async markHelpful(id: number): Promise<Review | undefined> {\n    const review = this.reviews.find((r) => r.id === id);\n    if (!review) return undefined;\n\n    review.helpful += 1;\n    review.updatedAt = new Date();\n    return review;\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const review = this.reviews.find((r) => r.id === id);",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async getAverageRating(productId: number): Promise<number> {\n    const productReviews = this.reviews.filter((r) => r.productId === productId);\n    if (productReviews.length === 0) return 0;\n\n    const sum = productReviews.reduce((acc, r) => acc + r.rating, 0);\n    return sum / productReviews.length;\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 51,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const productReviews = this.reviews.filter((r) => r.productId === productId);",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(r) => r.productId === productId",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const sum = productReviews.reduce((acc, r) => acc + r.rating, 0);",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(acc, r) => acc + r.rating",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 49,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async delete(id: number): Promise<boolean> {\n    const index = this.reviews.findIndex((r) => r.id === id);\n    if (index === -1) return false;\n    this.reviews.splice(index, 1);\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 53,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const index = this.reviews.findIndex((r) => r.id === id);",
+    "file_path": "sample_repo/src/services/reviewService.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 54,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "class PaymentService {\n  private payments: Payment[] = [];\n\n  async findAll(): Promise<Payment[]> {\n    return this.payments;\n  }\n\n  async findById(id: number): Promise<Payment | undefined> {\n    return this.payments.find((p) => p.id === id);\n  }\n\n  async findByOrderId(orderId: number): Promise<Payment | undefined> {\n    return this.payments.find((p) => p.orderId === orderId);\n  }\n\n  async processPayment(data: ProcessPaymentRequest): Promise<Payment> {\n    const transactionId = this.generateTransactionId();\n\n    const newPayment: Payment = {\n      id: Math.max(...this.payments.map((p) => p.id), 0) + 1,\n      ...data,\n      transactionId,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n      method: (data.method as Payment[\"method\"]) || \"credit_card\",\n    };\n\n    this.payments.push(newPayment);\n\n    // Simulate payment processing\n    setTimeout(() => {\n      const payment = this.payments.find((p) => p.id === newPayment.id);\n      if (payment) {\n        payment.status = \"completed\";\n        payment.updatedAt = new Date();\n      }\n    }, 1000);\n\n    return newPayment;\n  }\n\n  async refund(paymentId: number): Promise<Payment | undefined> {\n    const payment = this.payments.find((p) => p.id === paymentId);\n    if (!payment) return undefined;\n\n    payment.status = \"refunded\";\n    payment.updatedAt = new Date();\n    return payment;\n  }\n\n  async getPaymentsByStatus(status: Payment[\"status\"]): Promise<Payment[]> {\n    return this.payments.filter((p) => p.status === status);\n  }\n\n  async getTotalRevenue(): Promise<number> {\n    return this.payments\n      .filter((p) => p.status === \"completed\")\n      .reduce((sum, p) => sum + p.amount, 0);\n  }\n\n  private generateTransactionId(): string {\n    return `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;\n  }\n}",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Payment[]> {\n    return this.payments;\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 6,
+    "end_line": 8,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<Payment | undefined> {\n    return this.payments.find((p) => p.id === id);\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findByOrderId(orderId: number): Promise<Payment | undefined> {\n    return this.payments.find((p) => p.orderId === orderId);\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(p) => p.orderId === orderId",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async processPayment(data: ProcessPaymentRequest): Promise<Payment> {\n    const transactionId = this.generateTransactionId();\n\n    const newPayment: Payment = {\n      id: Math.max(...this.payments.map((p) => p.id), 0) + 1,\n      ...data,\n      transactionId,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n      method: (data.method as Payment[\"method\"]) || \"credit_card\",\n    };\n\n    this.payments.push(newPayment);\n\n    // Simulate payment processing\n    setTimeout(() => {\n      const payment = this.payments.find((p) => p.id === newPayment.id);\n      if (payment) {\n        payment.status = \"completed\";\n        payment.updatedAt = new Date();\n      }\n    }, 1000);\n\n    return newPayment;\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const transactionId = this.generateTransactionId();",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const newPayment: Payment = {\n      id: Math.max(...this.payments.map((p) => p.id), 0) + 1,\n      ...data,\n      transactionId,\n      status: \"pending\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n      method: (data.method as Payment[\"method\"]) || \"credit_card\",\n    };",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 29,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "() => {\n      const payment = this.payments.find((p) => p.id === newPayment.id);\n      if (payment) {\n        payment.status = \"completed\";\n        payment.updatedAt = new Date();\n      }\n    }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 40,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const payment = this.payments.find((p) => p.id === newPayment.id);",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(p) => p.id === newPayment.id",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 35,
+    "end_line": 35,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async refund(paymentId: number): Promise<Payment | undefined> {\n    const payment = this.payments.find((p) => p.id === paymentId);\n    if (!payment) return undefined;\n\n    payment.status = \"refunded\";\n    payment.updatedAt = new Date();\n    return payment;\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 52,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const payment = this.payments.find((p) => p.id === paymentId);",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(p) => p.id === paymentId",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async getPaymentsByStatus(status: Payment[\"status\"]): Promise<Payment[]> {\n    return this.payments.filter((p) => p.status === status);\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 54,
+    "end_line": 56,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(p) => p.status === status",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 55,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async getTotalRevenue(): Promise<number> {\n    return this.payments\n      .filter((p) => p.status === \"completed\")\n      .reduce((sum, p) => sum + p.amount, 0);\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 62,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(p) => p.status === \"completed\"",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 60,
+    "end_line": 60,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "(sum, p) => sum + p.amount",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 61,
+    "end_line": 61,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "private generateTransactionId(): string {\n    return `TXN-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;\n  }",
+    "file_path": "sample_repo/src/services/paymentService.ts",
+    "function_name": "anonymous",
+    "start_line": 64,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "interface User {\n  id: number;\n  name: string;\n  email: string;\n}",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 1,
+    "end_line": 5,
+    "language": "typescript",
+    "chunk_type": "interface"
+  },
+  {
+    "content": "class UserService {\n  private users: User[] = [\n    { id: 1, name: \"Alice\", email: \"alice@example.com\" },\n    { id: 2, name: \"Bob\", email: \"bob@example.com\" },\n  ];\n\n  async findAll(): Promise<User[]> {\n    return this.users;\n  }\n\n  async findById(id: number): Promise<User | undefined> {\n    return this.users.find((u) => u.id === id);\n  }\n\n  async create(data: Omit<User, \"id\">): Promise<User> {\n    const newUser: User = { id: this.users.length + 1, ...data };\n    this.users.push(newUser);\n    return newUser;\n  }\n\n  async deleteUser(id: number): Promise<boolean> {\n    const index = this.users.findIndex((u) => u.id === id);\n    if (index === -1) return false;\n    this.users.splice(index, 1);\n    return true;\n  }\n}",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 7,
+    "end_line": 33,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<User[]> {\n    return this.users;\n  }",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 13,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<User | undefined> {\n    return this.users.find((u) => u.id === id);\n  }",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 17,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async create(data: Omit<User, \"id\">): Promise<User> {\n    const newUser: User = { id: this.users.length + 1, ...data };\n    this.users.push(newUser);\n    return newUser;\n  }",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 21,
+    "end_line": 25,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const newUser: User = { id: this.users.length + 1, ...data };",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 22,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async deleteUser(id: number): Promise<boolean> {\n    const index = this.users.findIndex((u) => u.id === id);\n    if (index === -1) return false;\n    this.users.splice(index, 1);\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 27,
+    "end_line": 32,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const index = this.users.findIndex((u) => u.id === id);",
+    "file_path": "sample_repo/src/services/userService.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 28,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "class ProductService {\n  private products: Product[] = [\n    {\n      id: 1,\n      name: \"Laptop\",\n      description: \"High-performance laptop\",\n      price: 1299.99,\n      stock: 15,\n      categoryId: 1,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    },\n    {\n      id: 2,\n      name: \"Mouse\",\n      description: \"Wireless mouse\",\n      price: 29.99,\n      stock: 100,\n      categoryId: 2,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    },\n    {\n      id: 3,\n      name: \"Keyboard\",\n      description: \"Mechanical keyboard\",\n      price: 99.99,\n      stock: 50,\n      categoryId: 2,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    },\n  ];\n\n  async findAll(): Promise<Product[]> {\n    return this.products;\n  }\n\n  async findById(id: number): Promise<Product | undefined> {\n    return this.products.find((p) => p.id === id);\n  }\n\n  async findByCategory(categoryId: number): Promise<Product[]> {\n    return this.products.filter((p) => p.categoryId === categoryId);\n  }\n\n  async create(data: CreateProductRequest): Promise<Product> {\n    const newProduct: Product = {\n      id: Math.max(...this.products.map((p) => p.id), 0) + 1,\n      ...data,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n    this.products.push(newProduct);\n    return newProduct;\n  }\n\n  async update(id: number, data: Partial<CreateProductRequest>): Promise<Product | undefined> {\n    const product = this.products.find((p) => p.id === id);\n    if (!product) return undefined;\n\n    Object.assign(product, data, { updatedAt: new Date() });\n    return product;\n  }\n\n  async delete(id: number): Promise<boolean> {\n    const index = this.products.findIndex((p) => p.id === id);\n    if (index === -1) return false;\n    this.products.splice(index, 1);\n    return true;\n  }\n\n  async getInStock(): Promise<Product[]> {\n    return this.products.filter((p) => p.stock > 0);\n  }\n}",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 78,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Product[]> {\n    return this.products;\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 39,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<Product | undefined> {\n    return this.products.find((p) => p.id === id);\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 41,
+    "end_line": 43,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findByCategory(categoryId: number): Promise<Product[]> {\n    return this.products.filter((p) => p.categoryId === categoryId);\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 45,
+    "end_line": 47,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(p) => p.categoryId === categoryId",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 46,
+    "end_line": 46,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async create(data: CreateProductRequest): Promise<Product> {\n    const newProduct: Product = {\n      id: Math.max(...this.products.map((p) => p.id), 0) + 1,\n      ...data,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n    this.products.push(newProduct);\n    return newProduct;\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const newProduct: Product = {\n      id: Math.max(...this.products.map((p) => p.id), 0) + 1,\n      ...data,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async update(id: number, data: Partial<CreateProductRequest>): Promise<Product | undefined> {\n    const product = this.products.find((p) => p.id === id);\n    if (!product) return undefined;\n\n    Object.assign(product, data, { updatedAt: new Date() });\n    return product;\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 60,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const product = this.products.find((p) => p.id === id);",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 61,
+    "end_line": 61,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async delete(id: number): Promise<boolean> {\n    const index = this.products.findIndex((p) => p.id === id);\n    if (index === -1) return false;\n    this.products.splice(index, 1);\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 68,
+    "end_line": 73,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const index = this.products.findIndex((p) => p.id === id);",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 69,
+    "end_line": 69,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async getInStock(): Promise<Product[]> {\n    return this.products.filter((p) => p.stock > 0);\n  }",
+    "file_path": "sample_repo/src/services/productService.ts",
+    "function_name": "anonymous",
+    "start_line": 75,
+    "end_line": 77,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "class CategoryService {\n  private categories: Category[] = [\n    {\n      id: 1,\n      name: \"Electronics\",\n      description: \"Electronic devices and gadgets\",\n      slug: \"electronics\",\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    },\n    {\n      id: 2,\n      name: \"Accessories\",\n      description: \"Computer accessories\",\n      slug: \"accessories\",\n      parentCategoryId: 1,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    },\n  ];\n\n  async findAll(): Promise<Category[]> {\n    return this.categories;\n  }\n\n  async findById(id: number): Promise<Category | undefined> {\n    return this.categories.find((c) => c.id === id);\n  }\n\n  async findBySlug(slug: string): Promise<Category | undefined> {\n    return this.categories.find((c) => c.slug === slug);\n  }\n\n  async create(data: CreateCategoryRequest): Promise<Category> {\n    const slug = data.name.toLowerCase().replace(/\\s+/g, \"-\");\n    const newCategory: Category = {\n      id: Math.max(...this.categories.map((c) => c.id), 0) + 1,\n      ...data,\n      slug,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.categories.push(newCategory);\n    return newCategory;\n  }\n\n  async update(id: number, data: Partial<CreateCategoryRequest>): Promise<Category | undefined> {\n    const category = this.categories.find((c) => c.id === id);\n    if (!category) return undefined;\n\n    Object.assign(category, data, { updatedAt: new Date() });\n    return category;\n  }\n\n  async delete(id: number): Promise<boolean> {\n    const index = this.categories.findIndex((c) => c.id === id);\n    if (index === -1) return false;\n    this.categories.splice(index, 1);\n    return true;\n  }\n\n  async getSubcategories(parentId: number): Promise<Category[]> {\n    return this.categories.filter((c) => c.parentCategoryId === parentId);\n  }\n}",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 68,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Category[]> {\n    return this.categories;\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 24,
+    "end_line": 26,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findById(id: number): Promise<Category | undefined> {\n    return this.categories.find((c) => c.id === id);\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 28,
+    "end_line": 30,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findBySlug(slug: string): Promise<Category | undefined> {\n    return this.categories.find((c) => c.slug === slug);\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 32,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(c) => c.slug === slug",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 33,
+    "end_line": 33,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async create(data: CreateCategoryRequest): Promise<Category> {\n    const slug = data.name.toLowerCase().replace(/\\s+/g, \"-\");\n    const newCategory: Category = {\n      id: Math.max(...this.categories.map((c) => c.id), 0) + 1,\n      ...data,\n      slug,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };\n\n    this.categories.push(newCategory);\n    return newCategory;\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 36,
+    "end_line": 48,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const slug = data.name.toLowerCase().replace(/\\s+/g, \"-\");",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 37,
+    "end_line": 37,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "const newCategory: Category = {\n      id: Math.max(...this.categories.map((c) => c.id), 0) + 1,\n      ...data,\n      slug,\n      createdAt: new Date(),\n      updatedAt: new Date(),\n    };",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 38,
+    "end_line": 44,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async update(id: number, data: Partial<CreateCategoryRequest>): Promise<Category | undefined> {\n    const category = this.categories.find((c) => c.id === id);\n    if (!category) return undefined;\n\n    Object.assign(category, data, { updatedAt: new Date() });\n    return category;\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 56,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const category = this.categories.find((c) => c.id === id);",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 51,
+    "end_line": 51,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async delete(id: number): Promise<boolean> {\n    const index = this.categories.findIndex((c) => c.id === id);\n    if (index === -1) return false;\n    this.categories.splice(index, 1);\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 63,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const index = this.categories.findIndex((c) => c.id === id);",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 59,
+    "end_line": 59,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async getSubcategories(parentId: number): Promise<Category[]> {\n    return this.categories.filter((c) => c.parentCategoryId === parentId);\n  }",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 65,
+    "end_line": 67,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(c) => c.parentCategoryId === parentId",
+    "file_path": "sample_repo/src/services/categoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 66,
+    "end_line": 66,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "class InventoryService {\n  private inventory: Inventory[] = [];\n  private warehouses: WareHouse[] = [\n    { id: 1, name: \"Main Warehouse\", location: \"New York\", capacity: 10000, currentLoad: 3500 },\n    { id: 2, name: \"West Coast\", location: \"Los Angeles\", capacity: 8000, currentLoad: 2100 },\n  ];\n\n  async findAll(): Promise<Inventory[]> {\n    return this.inventory;\n  }\n\n  async findByProductId(productId: number): Promise<Inventory | undefined> {\n    return this.inventory.find((i) => i.productId === productId);\n  }\n\n  async findBySku(sku: string): Promise<Inventory | undefined> {\n    return this.inventory.find((i) => i.sku === sku);\n  }\n\n  async reserve(productId: number, quantity: number): Promise<boolean> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item || item.quantity - item.reserved < quantity) return false;\n\n    // wild mamals live here\n    const wildMamals = []\n\n    item.reserved += quantity;\n    return true;\n  }\n\n  async releaseReservation(productId: number, quantity: number): Promise<boolean> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item || item.reserved < quantity) return false;\n\n    item.reserved -= quantity;\n    return true;\n  }\n\n  async updateStock(productId: number, data: UpdateInventoryRequest): Promise<Inventory | undefined> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item) return undefined;\n\n    Object.assign(item, data, { updatedAt: new Date() });\n    return item;\n  }\n\n  async getLowStockItems(threshold: number = 10): Promise<Inventory[]> {\n    return this.inventory.filter((i) => i.quantity - i.reserved <= threshold);\n  }\n\n  async getWarehouses(): Promise<WareHouse[]> {\n    return this.warehouses;\n  }\n\n  async getWarehouseCapacity(warehouseId: number): Promise<number> {\n    const warehouse = this.warehouses.find((w) => w.id === warehouseId);\n    return warehouse ? warehouse.capacity - warehouse.currentLoad : 0;\n  }\n}",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 3,
+    "end_line": 61,
+    "language": "typescript",
+    "chunk_type": "class"
+  },
+  {
+    "content": "async findAll(): Promise<Inventory[]> {\n    return this.inventory;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 10,
+    "end_line": 12,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async findByProductId(productId: number): Promise<Inventory | undefined> {\n    return this.inventory.find((i) => i.productId === productId);\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 14,
+    "end_line": 16,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(i) => i.productId === productId",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 15,
+    "end_line": 15,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async findBySku(sku: string): Promise<Inventory | undefined> {\n    return this.inventory.find((i) => i.sku === sku);\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 18,
+    "end_line": 20,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(i) => i.sku === sku",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 19,
+    "end_line": 19,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async reserve(productId: number, quantity: number): Promise<boolean> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item || item.quantity - item.reserved < quantity) return false;\n\n    // wild mamals live here\n    const wildMamals = []\n\n    item.reserved += quantity;\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 22,
+    "end_line": 31,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const item = this.inventory.find((i) => i.productId === productId);",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(i) => i.productId === productId",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 23,
+    "end_line": 23,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "const wildMamals = []",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 27,
+    "end_line": 27,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "async releaseReservation(productId: number, quantity: number): Promise<boolean> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item || item.reserved < quantity) return false;\n\n    item.reserved -= quantity;\n    return true;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 33,
+    "end_line": 39,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const item = this.inventory.find((i) => i.productId === productId);",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(i) => i.productId === productId",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 34,
+    "end_line": 34,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async updateStock(productId: number, data: UpdateInventoryRequest): Promise<Inventory | undefined> {\n    const item = this.inventory.find((i) => i.productId === productId);\n    if (!item) return undefined;\n\n    Object.assign(item, data, { updatedAt: new Date() });\n    return item;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 41,
+    "end_line": 47,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const item = this.inventory.find((i) => i.productId === productId);",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 42,
+    "end_line": 42,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(i) => i.productId === productId",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 42,
+    "end_line": 42,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async getLowStockItems(threshold: number = 10): Promise<Inventory[]> {\n    return this.inventory.filter((i) => i.quantity - i.reserved <= threshold);\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 49,
+    "end_line": 51,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "(i) => i.quantity - i.reserved <= threshold",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 50,
+    "end_line": 50,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  },
+  {
+    "content": "async getWarehouses(): Promise<WareHouse[]> {\n    return this.warehouses;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 53,
+    "end_line": 55,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "async getWarehouseCapacity(warehouseId: number): Promise<number> {\n    const warehouse = this.warehouses.find((w) => w.id === warehouseId);\n    return warehouse ? warehouse.capacity - warehouse.currentLoad : 0;\n  }",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 57,
+    "end_line": 60,
+    "language": "typescript",
+    "chunk_type": "method"
+  },
+  {
+    "content": "const warehouse = this.warehouses.find((w) => w.id === warehouseId);",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "variable"
+  },
+  {
+    "content": "(w) => w.id === warehouseId",
+    "file_path": "sample_repo/src/services/inventoryService.ts",
+    "function_name": "anonymous",
+    "start_line": 58,
+    "end_line": 58,
+    "language": "typescript",
+    "chunk_type": "arrow_function"
+  }
+]
