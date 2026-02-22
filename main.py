@@ -11,18 +11,41 @@ from src.usecase.orchestration.orchestration_usecase import OrchestrationUseCase
 from src.usecase.search_codebase_usecase import SearchCodebaseUseCase
 
 if __name__ == "__main__":
-    # Load .env file for OPENAI_API_KEY and other config
     load_dotenv()
 
     initial_prompt = ""
     with open("sample_requirements/#1/prompt.md", "r") as f:
         initial_prompt = f.read()
 
-    orchestration_usecase = OrchestrationUseCase()
-    result = orchestration_usecase.execute(initial_prompt=initial_prompt)
+    results = {
+        "testCase1": [],
+        "testCase2": [],
+        "testCase3": [],
+    }
+    iterations = 5
 
-    print("Result:")
-    print(result)
+    orchestration_usecase = OrchestrationUseCase()
+    # for i in range(iterations):
+    #     result = orchestration_usecase.execute(initial_prompt=initial_prompt)
+    #     results["testCase1"].append(result)
+
+    # initial_prompt = ""
+    # with open("sample_requirements/#2/prompt.md", "r") as f:
+    #     initial_prompt = f.read()
+
+    # for i in range(iterations):
+    #     result = orchestration_usecase.execute(initial_prompt=initial_prompt)
+    #     results["testCase2"].append(result)
+
+    initial_prompt = ""
+    with open("sample_requirements/#3/prompt.md", "r") as f:
+        initial_prompt = f.read()
+
+    for i in range(iterations):
+        result = orchestration_usecase.execute(initial_prompt=initial_prompt)
+        results["testCase3"].append(result)
+
+    print(json.dumps(results, indent=2))
 
     # # ── Wire up services ───────────────────────────────────────────────────────
     # parser_service = ParserService()
